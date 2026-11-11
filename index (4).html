@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>シフト管理</title>
+  <meta charset="utf-8">
+  <style>
+  :root {
+    --pink: #d6336c; --pink-soft: #fde8ef; --ink: #222; --sub: #777; --line: #e6e6e6;
+    --bg: #f7f5f6; --ok: #2b8a3e; --ok-soft: #e6f4ea; --ng: #868e96; --ng-soft: #f1f3f5;
+    --wait: #e67700; --wait-soft: #fff4e0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; font-size: 16px; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--pink); color: #fff;
+    display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
+  header h1 { font-size: 18px; margin: 0; }
+  main { max-width: 720px; margin: 0 auto; padding: 12px; }
+  .card { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  label { display: block; font-size: 13px; color: var(--sub); margin-bottom: 10px; }
+  input, select { display: block; width: 100%; margin-top: 4px; padding: 10px; font-size: 16px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); }
+  button { font-size: 15px; border-radius: 8px; padding: 10px 14px; border: 0; cursor: pointer; }
+  button:disabled { opacity: .5; }
+  .primary { background: var(--pink); color: #fff; width: 100%; font-weight: bold; }
+  .ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); }
+  header .ghost { color: #fff; border-color: rgba(255,255,255,.6); padding: 6px 10px; font-size: 13px; }
+  .ok-btn { background: var(--ok); color: #fff; }
+  .ng-btn { background: var(--ng-soft); color: var(--ink); }
+  .small { padding: 6px 10px; font-size: 13px; }
+  .hidden { display: none !important; }
+  .hint { font-size: 12px; color: var(--sub); margin: 8px 0 0; }
+  .row3 { display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 6px; align-items: end; }
+  .row3 label { margin-bottom: 6px; }
+  .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; font-weight: bold; }
+  .b-申請中 { background: var(--wait-soft); color: var(--wait); }
+  .b-確定 { background: var(--ok-soft); color: var(--ok); }
+  .b-見送り { background: var(--ng-soft); color: var(--ng); }
+  .item { border-top: 1px solid var(--line); padding: 10px 0; }
+  .item:first-child { border-top: 0; }
+  .item .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .muted { color: var(--sub); font-size: 13px; }
+  .empty { color: var(--sub); text-align: center; padding: 16px 0; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #333; color: #fff;
+    padding: 10px 16px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s;
+    pointer-events: none; max-width: 90%; z-index: 20; }
+  #toast.show { opacity: 1; }
+  #toast.err { background: #c92a2a; }
+</style>
+
+  <style>
+    header .who { font-size: 12px; opacity: .9; margin-right: 8px; }
+    .rolebadge { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 999px;
+      background: rgba(255,255,255,.25); margin-left: 4px; }
+    .navtabs { display: flex; gap: 6px; margin-bottom: 12px; position: sticky; top: 46px; z-index: 4;
+      background: var(--bg); padding: 6px 0; }
+    .navtabs button { flex: 1; background: #fff; border: 1px solid var(--line); font-size: 14px; padding: 10px 4px; }
+    .navtabs button.on { background: var(--pink); color: #fff; border-color: var(--pink); font-weight: bold; }
+    .navtabs .cnt { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 999px;
+      background: var(--wait); color: #fff; font-size: 11px; line-height: 18px; }
+    .weeknav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+    .weeknav b { font-size: 14px; }
+    .subtabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .subtabs button { flex: 1; background: #fff; border: 1px solid var(--line); font-size: 13px; padding: 7px; }
+    .subtabs button.on { border-color: var(--pink); color: var(--pink); font-weight: bold; }
+    .legend { display: flex; gap: 12px; font-size: 12px; color: var(--sub); margin-bottom: 8px; flex-wrap: wrap; }
+    .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+
+    /* ガントチャート共通 */
+    .gwrap { overflow-x: auto; }
+    .gantt { width: 100%; border-collapse: collapse; table-layout: fixed; user-select: none; -webkit-user-select: none; }
+    .gantt th { font-size: 11px; font-weight: normal; padding: 4px 1px; line-height: 1.3; background: #fff;
+      border-bottom: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gantt th.sat { color: #1c7ed6; } .gantt th.sun { color: #e03131; }
+    .gantt th .lock { display: block; font-size: 9px; color: var(--sub); }
+    .gantt td { height: 17px; border-left: 1px solid var(--line); touch-action: manipulation; }
+    .gantt tr.hour td { border-top: 1px solid #ddd; }
+    .gantt tr.half td { border-top: 1px dotted #eee; }
+    .gantt td.tcol { width: 30px; border-left: 0; font-size: 10px; color: var(--sub); text-align: right;
+      padding-right: 4px; vertical-align: top; line-height: 1; }
+    .gantt td.ncol { width: 34px; font-size: 11px; text-align: center; font-weight: bold; color: #555; }
+    .gantt td.pick { cursor: pointer; }
+    .gantt td.sel { background: var(--pink); }
+    .gantt td.startpt { background: var(--pink); opacity: .55; }
+    .gantt td.lk-wait { background: #ffd8a8; }
+    .gantt td.pend-old { background: #fff4e6; }
+    .gantt td.pend-off { background: repeating-linear-gradient(45deg, #ffd8a8 0 4px, #fff4e6 4px 8px); }
+    .gantt td.pend-old-off { background: repeating-linear-gradient(45deg, #fff4e6 0 4px, #fff 4px 8px); }
+    .ovr { display: inline-block; font-size: 11px; color: var(--wait); border: 1px solid var(--wait); border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+    .gantt td.lk-ok { background: #b2f2bb; }
+    .gantt td.lk-day { background: #fafafa; }
+    #r-gantt td.lk-wait, #r-gantt td.lk-ok, #r-gantt td.lk-day, #r-gantt td.lk-off { cursor: pointer; }
+    .gantt td.bar-ok { background: #69db7c; }
+    .offchk { display: flex; align-items: center; justify-content: center; gap: 2px; margin: 3px 2px 0; padding: 2px 0;
+      font-size: 11px; color: var(--sub); border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; }
+    .offchk input { display: inline-block; width: 12px; height: 12px; margin: 0; padding: 0; }
+    .offchk.on { background: #495057; color: #fff; border-color: #495057; font-weight: bold; }
+    .gantt td.offsel { background: repeating-linear-gradient(45deg, #ced4da 0 4px, #f1f3f5 4px 8px); }
+    .gantt td.lk-off { background: repeating-linear-gradient(45deg, #e9ecef 0 4px, #f8f9fa 4px 8px); cursor: not-allowed; }
+    .offtag { display: inline-block; background: #495057; color: #fff; font-size: 12px; padding: 1px 8px; border-radius: 999px; }
+    .offtxt { color: #495057; font-weight: bold; }
+    .editbox { background: var(--pink-soft); border-radius: 8px; padding: 10px; margin-top: 8px; }
+    .seg { display: flex; gap: 6px; margin-bottom: 8px; }
+    .seg label { flex: 1; margin: 0; text-align: center; border: 1px solid var(--line); background: #fff;
+      border-radius: 8px; padding: 8px 0; color: var(--ink); font-size: 14px; }
+    .seg input { display: none; }
+    .seg label.on { border-color: var(--pink); color: var(--pink); font-weight: bold; }
+    .editbox .decide.dis { opacity: .35; pointer-events: none; }
+    .prevnote { color: var(--wait); font-size: 13px; }
+    .rowbtns { display: flex; gap: 6px; margin-top: 6px; }
+    .gantt td.bar-wait { background: #ffc078; }
+
+    /* 送信内容 */
+    .sum-item { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center;
+      border-top: 1px solid var(--line); padding: 8px 0; }
+    .sum-item:first-child { border-top: 0; }
+    .sum-item input { margin-top: 4px; padding: 8px; font-size: 14px; }
+    .waiting { color: var(--pink); font-size: 13px; }
+    .defrow { display: grid; grid-template-columns: 64px 1fr 1fr; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .defrow .dw { display: flex; align-items: center; gap: 4px; font-weight: bold; font-size: 14px; }
+    .defrow .dw input { width: 20px; height: 20px; margin: 0; }
+    .defrow input[type=time] { margin: 0; padding: 7px; font-size: 15px; }
+    .defrow.off input[type=time] { opacity: .35; }
+
+    /* 確定作業 */
+    .day h3 { font-size: 14px; margin: 0 0 4px; padding: 6px 10px; background: var(--pink-soft); border-radius: 6px; }
+    .decide { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+    .decide label { margin: 0; }
+    .decide .full { grid-column: 1 / -1; }
+    .btns { display: flex; gap: 6px; margin-top: 8px; }
+    .btns button { flex: 1; }
+    .pending-pill { background: var(--wait-soft); color: var(--wait); font-weight: bold; padding: 4px 10px; border-radius: 999px; font-size: 13px; }
+    .daystrip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .daystrip button { position: relative; padding: 6px 0; font-size: 12px; line-height: 1.3; background: #fff;
+      border: 1px solid var(--line); color: var(--ink); }
+    .daystrip button.sat { color: #1c7ed6; } .daystrip button.sun { color: #e03131; }
+    .daystrip button.on { background: var(--pink); border-color: var(--pink); color: #fff; font-weight: bold; }
+    .daystrip .dc { position: absolute; top: -6px; right: -4px; min-width: 16px; padding: 0 4px; border-radius: 999px;
+      background: var(--wait); color: #fff; font-size: 10px; line-height: 16px; font-weight: bold; }
+    .daystrip .dk { display: block; font-size: 10px; opacity: .8; }
+    .bulk { width: 100%; margin-top: 10px; background: var(--ok); color: #fff; font-weight: bold; }
+    details summary { cursor: pointer; font-weight: bold; }
+
+    /* 週の表 */
+    .wtable { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 13px; background: #fff; }
+    .wtable th, .wtable td { border: 1px solid var(--line); padding: 6px; text-align: center; white-space: nowrap; }
+    .wtable th { background: var(--pink-soft); }
+    .wtable td.name { text-align: left; font-weight: bold; position: sticky; left: 0; background: #fff; }
+    .wtable td .wait { color: var(--wait); font-size: 11px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>シフト管理</h1>
+    <div>
+      <span class="who hidden" id="whoLabel"></span>
+      <button id="logoutBtn" class="ghost hidden">ログアウト</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ログイン -->
+    <section id="loginView" class="card">
+      <h2>ログイン</h2>
+      <label>名前<select id="staffSel"></select></label>
+      <label>PIN<input id="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off"></label>
+      <button id="loginBtn" class="primary">ログイン</button>
+    </section>
+
+    <section id="appView" class="hidden">
+      <nav class="navtabs">
+        <button data-tab="req">希望を出す</button>
+        <button data-tab="all" class="hidden">全員のシフト</button>
+        <button data-tab="mng" class="hidden">確定作業<span class="cnt hidden" id="mngCnt"></span></button>
+      </nav>
+
+      <!-- ===== 希望を出す ===== -->
+      <div id="tab-req" class="tab hidden">
+        <div class="card">
+          <h2><span id="r-who"></span>さん　出勤希望を出す</h2>
+          <div class="weeknav">
+            <button class="ghost small" id="r-prev">◀ 前</button>
+            <b id="r-range"></b>
+            <button class="ghost small" id="r-next">次 ▶</button>
+          </div>
+          <div class="legend">
+            <span><i style="background:var(--pink)"></i>選択中</span>
+            <span><i style="background:#ffd8a8"></i>申請中</span>
+            <span><i style="background:#b2f2bb"></i>確定</span>
+            <span><i style="background:repeating-linear-gradient(45deg,#ced4da 0 3px,#f1f3f5 3px 6px)"></i>休み</span>
+          </div>
+          <button class="ghost" id="r-applyDef" style="width:100%;margin-bottom:8px">📌 固定シフトを追加（この1週間）</button>
+          <p class="hint" style="margin:0 0 8px">出たい日の<b>開始の時間</b>をタップ → <b>終了の時間</b>をタップ。もう一度タップすると消えます。休みたい日は日付の<b>「休」</b>にチェックを入れてください。申請中の日はそのまま選び直すと<b>上書き申請</b>になります。確定済みの日はタップすると編集画面が開きます。</p>
+          <table class="gantt" id="r-gantt"></table>
+        </div>
+        <div class="card">
+          <h2>送信する内容</h2>
+          <div id="r-summary"></div>
+          <button id="r-submit" class="primary" style="margin-top:10px" disabled>まとめて送信する</button>
+        </div>
+        <div class="card">
+          <h2>出した希望</h2>
+          <div id="r-mine"><div class="empty">読み込み中…</div></div>
+        </div>
+        <div class="card">
+          <details id="d-box">
+            <summary>⚙ 固定シフトの設定</summary>
+            <p class="hint" style="margin:8px 0">毎週だいたい同じ時間に出る曜日を登録しておくと、「固定シフトを追加」でまとめて入ります。</p>
+            <div id="d-rows"></div>
+            <button class="ghost small" id="d-copy" style="margin:6px 0 10px">一番上の時間を、チェックした曜日全部にコピー</button>
+            <button class="primary" id="d-save">固定シフトを保存</button>
+          </details>
+        </div>
+      </div>
+
+      <!-- ===== 全員のシフト ===== -->
+      <div id="tab-all" class="tab hidden">
+        <div class="card">
+          <div class="subtabs">
+            <button id="a-modeDay" class="on">1日ごと</button>
+            <button id="a-modeWeek">1週間の表</button>
+          </div>
+          <div class="weeknav">
+            <button class="ghost small" id="a-prev">◀</button>
+            <div style="text-align:center"><b id="a-label"></b><br>
+              <button class="ghost small" id="a-today" style="margin-top:4px">今日</button></div>
+            <button class="ghost small" id="a-next">▶</button>
+          </div>
+          <div class="legend">
+            <span><i style="background:#69db7c"></i>確定</span>
+            <span class="adminOnly"><i style="background:#ffc078"></i>申請中（未確定）</span>
+          </div>
+          <div id="a-body" class="gwrap"></div>
+          <p class="hint" id="a-hint"></p>
+        </div>
+      </div>
+
+      <!-- ===== 確定作業（管理者） ===== -->
+      <div id="tab-mng" class="tab hidden">
+        <div class="card">
+          <div class="weeknav">
+            <button class="ghost small" id="m-prev">◀ 前週</button>
+            <div style="text-align:center"><b id="m-label"></b><br>
+              <button class="ghost small" id="m-this" style="margin-top:4px">今日</button></div>
+            <button class="ghost small" id="m-next">次週 ▶</button>
+          </div>
+          <div class="daystrip" id="m-strip"></div>
+          <div style="text-align:center;margin-top:10px"><span class="pending-pill" id="m-pill"></span></div>
+        </div>
+        <div class="card" id="m-day"></div>
+        <div class="card" id="m-list"></div>
+        <div class="card">
+          <details>
+            <summary>＋ シフトを直接追加（LINEで聞いた分など）</summary>
+            <div style="margin-top:12px">
+              <label>スタッフ<select id="m-addStaff"></select></label>
+              <div class="decide">
+                <label class="full">日付<input type="date" id="m-addDate"></label>
+                <label>開始<input type="time" id="m-addStart" value="20:00" step="900"></label>
+                <label>終了<input type="time" id="m-addEnd" value="02:00" step="900"></label>
+                <label class="full">コメント（任意）<input id="m-addComment" maxlength="100"></label>
+              </div>
+              <button class="primary" id="m-addBtn" style="margin-top:10px">確定で追加</button>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+  <div id="toast"></div>
+
+  <script>
+    /* ============================================================
+       ★ ここに Apps Script のウェブアプリURL（末尾が /exec）を貼ってください ★
+       ============================================================ */
+    window.API_URL = 'https://script.google.com/macros/s/AKfycbzxspMhcN9Ag7z4NBn9CAGeITqbt_Y3kpcq-IqLds3SN91kFWWbkiWKnT9bGSByrQRR/exec';
+  </script>
+  <script>
+    if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(window.API_URL)) {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.body.insertAdjacentHTML('afterbegin',
+          '<div style="background:#c92a2a;color:#fff;padding:12px;font-size:14px">設定エラー：index.html の API_URL にウェブアプリのURL（末尾 /exec）を入れてください</div>');
+      });
+    }
+  </script>
+  <script>
+  // サーバー関数を Promise で呼ぶ。
+  // Googleのログイン情報を送らない fetch で通信するので、複数アカウントでログインしたスマホでも動く。
+  function call(fn) {
+    const args = Array.prototype.slice.call(arguments, 1);
+    if (!window.API_URL) return Promise.reject(new Error('通信先のURLが設定されていません'));
+    return fetch(window.API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // 事前確認なしで送れる形式
+      body: JSON.stringify({ fn: fn, args: args }),
+      credentials: 'omit',                                       // Googleのログイン情報を送らない
+      redirect: 'follow',
+    })
+      .then(r => { if (!r.ok) throw new Error('通信エラー（' + r.status + '）'); return r.json(); })
+      .then(j => { if (!j.ok) throw new Error(j.error); return j.result; })
+      .catch(e => {
+        if (e instanceof TypeError) throw new Error('通信できませんでした。電波の良いところで、もう一度お試しください');
+        throw e;
+      });
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  // 終了が開始以下なら翌日扱い
+  function fmtRange(s, e) {
+    if (!s || !e) return '';
+    return s + '〜' + (e <= s ? '翌' : '') + e;
+  }
+
+  const DOW = ['日', '月', '火', '水', '木', '金', '土'];
+  function parseYmd(ymd) { const p = ymd.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); }
+  function toYmd(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function addDays(ymd, n) { const d = parseYmd(ymd); d.setDate(d.getDate() + n); return toYmd(d); }
+  function fmtDate(ymd) { const d = parseYmd(ymd); return (d.getMonth() + 1) + '/' + d.getDate() + '（' + DOW[d.getDay()] + '）'; }
+  function todayYmd() { return toYmd(new Date()); }
+
+  let toastTimer;
+  function toast(msg, isErr) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'show' + (isErr ? ' err' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+  }
+
+  function errMsg(e) { return (e && e.message) ? e.message.replace(/^Error:\s*/, '') : String(e); }
+
+  async function fillStaffSelect(sel, adminOnly) {
+    const list = await call('getStaffList', adminOnly);
+    sel.innerHTML = '<option value="">選んでください</option>' +
+      list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>').join('');
+    return list;
+  }
+</script>
+
+  <script>
+    // ===== 営業時間の設定（ここを変えるとカレンダーの縦軸が変わります） =====
+    const OPEN_HOUR = 10;    // 何時から（10 = 10:00）
+    const CLOSE_HOUR = 29;   // 何時まで（24以上は翌日。29 = 翌5:00）
+    const SLOT_MIN = 30;     // 1マスの分数
+    const DAYS = 7;          // 希望カレンダーの表示日数
+    // ======================================================================
+
+    const NSLOT = (CLOSE_HOUR - OPEN_HOUR) * 60 / SLOT_MIN;
+    const $ = id => document.getElementById(id);
+    const pad = n => String(n).padStart(2, '0');
+    let me = null;            // {token, name, role, canSeeAll}
+    let curTab = null;
+
+    /* ---------- 時間とマスの変換 ---------- */
+    function slotTime(i) {
+      const m = OPEN_HOUR * 60 + i * SLOT_MIN;
+      return pad(Math.floor(m / 60) % 24) + ':' + pad(m % 60);
+    }
+    function timeToMin(t) {
+      const p = t.split(':').map(Number);
+      let m = p[0] * 60 + p[1];
+      if (m < OPEN_HOUR * 60) m += 1440;
+      return m;
+    }
+    function rangeToSlots(s, e) {        // [a, b)
+      if (!s || !e) return [0, 0];
+      const sm = timeToMin(s);
+      let em = timeToMin(e);
+      if (em <= sm) em += 1440;
+      const a = (sm - OPEN_HOUR * 60) / SLOT_MIN, b = (em - OPEN_HOUR * 60) / SLOT_MIN;
+      return [Math.max(0, Math.floor(a)), Math.min(NSLOT, Math.ceil(b))];
+    }
+    function timeRowHead(i) {
+      const mins = OPEN_HOUR * 60 + i * SLOT_MIN;
+      const isHour = mins % 60 === 0, hr = Math.floor(mins / 60);
+      return { cls: isHour ? 'hour' : 'half', label: isHour ? (hr >= 24 ? '翌' + (hr - 24) : hr) : '' };
+    }
+    function dayHead(d) {
+      const dow = parseYmd(d).getDay();
+      return { cls: dow === 6 ? 'sat' : dow === 0 ? 'sun' : '', html: fmtDate(d).replace('（', '<br>(').replace('）', ')') };
+    }
+    const isOff = x => x.type === '休み';
+    function statusText(x) {
+      if (!isOff(x)) return x.status;
+      return x.status === '確定' ? '休み承認' : x.status === '見送り' ? '休み却下' : '休み希望';
+    }
+    function mondayOf(ymd) {
+      const d = parseYmd(ymd);
+      d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+      return toYmd(d);
+    }
+
+    /* ---------- 1日分のガント（全員のシフト・確定作業で共通） ---------- */
+    const slotsOf = x => x.status === '確定' ? rangeToSlots(x.cStart, x.cEnd) : rangeToSlots(x.start, x.end);
+    function dayGanttHtml(list) {
+    const spans = list.map(x => slotsOf(x));
+    let h = '<table class="gantt"><thead><tr><th style="width:30px"></th><th style="width:34px">人数</th>' +
+      list.map(x => '<th title="' + esc(x.name) + '">' + esc(x.name) +
+        (x.status === '申請中' ? '<span class="lock">申請中</span>' : '') + '</th>').join('') + '</tr></thead><tbody>';
+
+    let maxCnt = 0;
+    const counts = [];
+    for (let i = 0; i < NSLOT; i++) {
+      const c = list.filter((x, k) => x.status === '確定' && i >= spans[k][0] && i < spans[k][1]).length;
+      counts.push(c); maxCnt = Math.max(maxCnt, c);
+    }
+    for (let i = 0; i < NSLOT; i++) {
+      const th = timeRowHead(i);
+      const alpha = maxCnt ? (0.12 + 0.5 * counts[i] / maxCnt) : 0;
+      h += '<tr class="' + th.cls + '"><td class="tcol">' + th.label + '</td>' +
+        '<td class="ncol" style="background:rgba(214,51,108,' + (counts[i] ? alpha : 0) + ')">' + (counts[i] || '') + '</td>';
+      list.forEach((x, k) => {
+        const on = i >= spans[k][0] && i < spans[k][1];
+        h += '<td class="' + (on ? (x.status === '確定' ? 'bar-ok' : 'bar-wait') : '') + '"></td>';
+      });
+      h += '</tr>';
+    }
+    return h + '</tbody></table>';
+    }
+
+    /* ---------- ログイン／共通 ---------- */
+    fillStaffSelect($('staffSel')).catch(e => toast(errMsg(e), true));
+
+    $('loginBtn').onclick = async () => {
+      const id = $('staffSel').value, pin = $('pin').value;
+      if (!id || !pin) return toast('名前とPINを入れてください', true);
+      $('loginBtn').disabled = true;
+      try {
+        me = await call('login', id, pin);
+        $('pin').value = '';
+        startApp();
+      } catch (e) { toast(errMsg(e), true); }
+      $('loginBtn').disabled = false;
+    };
+
+    $('logoutBtn').onclick = () => { if (me) call('logout', me.token); backToLogin(); };
+
+    function backToLogin(msg) {
+      me = null;
+      $('appView').classList.add('hidden');
+      $('logoutBtn').classList.add('hidden');
+      $('whoLabel').classList.add('hidden');
+      $('loginView').classList.remove('hidden');
+      if (msg) toast(msg, true);
+    }
+
+    function handleErr(e) {
+      const m = errMsg(e);
+      if (m.indexOf('SESSION_EXPIRED') >= 0) backToLogin('時間が経ったので、もう一度ログインしてください');
+      else toast(m, true);
+    }
+
+    const isAdmin = () => me && me.role === '管理者';
+
+    function startApp() {
+      $('loginView').classList.add('hidden');
+      $('appView').classList.remove('hidden');
+      $('logoutBtn').classList.remove('hidden');
+      $('whoLabel').innerHTML = esc(me.name) + '<span class="rolebadge">' + esc(me.role) + '</span>';
+      $('whoLabel').classList.remove('hidden');
+      $('r-who').textContent = me.name;
+
+      document.querySelector('[data-tab="all"]').classList.toggle('hidden', !me.canSeeAll);
+      document.querySelector('[data-tab="mng"]').classList.toggle('hidden', !isAdmin());
+      document.querySelectorAll('.adminOnly').forEach(el => el.classList.toggle('hidden', !isAdmin()));
+
+      R.reset(); A.reset(); M.reset();
+      showTab(isAdmin() ? 'mng' : 'req');
+      if (isAdmin()) fillStaffSelect($('m-addStaff'));
+    }
+
+    document.querySelector('.navtabs').addEventListener('click', ev => {
+      const b = ev.target.closest('button[data-tab]');
+      if (b) showTab(b.dataset.tab);
+    });
+
+    function showTab(name) {
+      curTab = name;
+      document.querySelectorAll('.navtabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('hidden', t.id !== 'tab-' + name));
+      ({ req: R, all: A, mng: M })[name].load();
+    }
+
+    /* ==================================================================
+       希望を出す
+       ================================================================== */
+    const R = {
+      viewStart: null, mine: [], sel: {}, memos: {}, defs: [null, null, null, null, null, null, null],
+      reset() {
+        this.viewStart = todayYmd(); this.mine = []; this.sel = {}; this.memos = {};
+        this.defs = [null, null, null, null, null, null, null];
+        this.render(); this.renderSummary(); this.renderDefs();
+      },
+
+      async load() {
+        try {
+          const res = await Promise.all([call('staffMyList', me.token), call('getMyDefault', me.token)]);
+          this.mine = res[0];
+          this.defs = res[1];
+          this.render();
+          this.renderMine();
+          this.renderDefs();
+        } catch (e) { handleErr(e); }
+      },
+
+      /* ---- 固定シフト ---- */
+      DEF_ORDER: [1, 2, 3, 4, 5, 6, 0],   // 表示は月曜はじまり（値は getDay の番号）
+
+      renderDefs() {
+        $('d-rows').innerHTML = this.DEF_ORDER.map(w => {
+          const d = this.defs[w];
+          return '<div class="defrow' + (d ? '' : ' off') + '" data-w="' + w + '">' +
+            '<label class="dw"><input type="checkbox" class="d-on"' + (d ? ' checked' : '') + '>' + DOW[w] + '</label>' +
+            '<input type="time" class="d-s" step="900" value="' + (d ? d.start : '17:00') + '">' +
+            '<input type="time" class="d-e" step="900" value="' + (d ? d.end : '03:00') + '">' +
+          '</div>';
+        }).join('');
+      },
+
+      readDefForm() {
+        const out = [null, null, null, null, null, null, null];
+        document.querySelectorAll('#d-rows .defrow').forEach(r => {
+          if (r.querySelector('.d-on').checked) {
+            out[Number(r.dataset.w)] = { start: r.querySelector('.d-s').value, end: r.querySelector('.d-e').value };
+          }
+        });
+        return out;
+      },
+
+      async saveDefs() {
+        const days = this.readDefForm();
+        if (days.some(d => d && (!d.start || !d.end || d.start === d.end))) return toast('時間を正しく入れてください', true);
+        $('d-save').disabled = true;
+        try {
+          await call('saveMyDefault', me.token, days);
+          this.defs = days;
+          toast('固定シフトを保存しました');
+        } catch (e) { handleErr(e); }
+        $('d-save').disabled = false;
+      },
+
+      applyDefs() {
+        if (!this.defs.some(Boolean)) {
+          $('d-box').open = true;
+          $('d-box').scrollIntoView({ behavior: 'smooth' });
+          return toast('先に下の「固定シフトの設定」で曜日と時間を登録してください', true);
+        }
+        let n = 0, skipped = 0;
+        for (let i = 0; i < DAYS; i++) {
+          const d = addDays(this.viewStart, i);
+          const def = this.defs[parseYmd(d).getDay()];
+          if (!def) continue;
+          if (this.lockedOf(d) || this.pendingOf(d)) { skipped++; continue; }
+          if (this.sel[d] && this.sel[d].off) continue;     // 休みにした日はそのまま
+          const r = rangeToSlots(def.start, def.end);
+          if (r[1] <= r[0]) continue;               // 営業時間外
+          this.sel[d] = { a: r[0], b: r[1] - 1 };
+          n++;
+        }
+        this.render();
+        this.renderSummary();
+        if (n) toast(n + '日分を追加しました。確認して「まとめて送信する」を押してください');
+        else toast(skipped ? 'この週の固定シフトの日は、もう希望を出しています' : 'この週に固定シフトの曜日がありません', true);
+      },
+
+      // 確定済みはカレンダーでは触れない（タップで編集画面）。申請中はカレンダー上でそのまま上書きできる
+      lockedOf(d) { return this.mine.find(x => x.date === d && x.status === '確定'); },
+      pendingOf(d) { return this.mine.find(x => x.date === d && x.status === '申請中'); },
+
+      render() {
+        const days = [...Array(DAYS)].map((_, i) => addDays(this.viewStart, i));
+        $('r-range').textContent = fmtDate(days[0]) + ' 〜 ' + fmtDate(days[DAYS - 1]);
+        $('r-prev').disabled = this.viewStart <= todayYmd();
+
+        const lock = {};
+        days.forEach(d => {
+          const x = this.lockedOf(d);
+          if (x && isOff(x)) lock[d] = { label: statusText(x), off: true };
+          else if (x) {
+            const r = x.status === '確定' ? rangeToSlots(x.cStart, x.cEnd) : rangeToSlots(x.start, x.end);
+            lock[d] = { label: x.status, status: x.status, a: r[0], b: r[1] };
+          }
+        });
+
+        const pend = {};
+        days.forEach(d => {
+          const x = this.pendingOf(d);
+          if (x && isOff(x)) pend[d] = { off: true };
+          else if (x) { const r = rangeToSlots(x.start, x.end); pend[d] = { a: r[0], b: r[1] }; }
+        });
+
+        let h = '<thead><tr><th style="width:30px"></th>' + days.map(d => {
+          const dh = dayHead(d);
+          const on = this.sel[d] && this.sel[d].off;
+          const pl = pend[d] ? '<span class="lock" style="color:var(--wait)">' + (this.sel[d] ? '上書き' : pend[d].off ? '休み申請中' : '申請中') + '</span>' : '';
+          return '<th class="' + dh.cls + '">' + dh.html + (lock[d] ? '<span class="lock">' + lock[d].label + '</span>' : pl +
+            '<label class="offchk' + (on ? ' on' : '') + '"><input type="checkbox" data-off="' + d + '"' + (on ? ' checked' : '') + '>休</label>') + '</th>';
+        }).join('') + '</tr></thead><tbody>';
+
+        for (let i = 0; i < NSLOT; i++) {
+          const th = timeRowHead(i);
+          h += '<tr class="' + th.cls + '"><td class="tcol">' + th.label + '</td>';
+          days.forEach(d => {
+            const lk = lock[d], s = this.sel[d];
+            let cls = 'pick';
+            if (lk && lk.off) cls = 'lk-off';
+            else if (lk) cls = (i >= lk.a && i < lk.b) ? (lk.status === '確定' ? 'lk-ok' : 'lk-wait') : 'lk-day';
+            else if (s && s.off) cls += ' offsel';
+            else if (s && s.b === null && i === s.a) cls += ' startpt';
+            else if (s && s.b !== null && i >= s.a && i <= s.b) cls += ' sel';
+            else if (pend[d] && pend[d].off) cls += s ? ' pend-old-off' : ' pend-off';
+            else if (pend[d] && i >= pend[d].a && i < pend[d].b) cls += s ? ' pend-old' : ' lk-wait';
+            h += '<td class="' + cls + '" data-d="' + d + '" data-i="' + i + '"></td>';
+          });
+          h += '</tr>';
+        }
+        $('r-gantt').innerHTML = h + '</tbody>';
+      },
+
+      tap(d, i) {
+        const lk = this.lockedOf(d);
+        if (lk) return this.openEdit(lk.id);
+        this.keepMemo(d);
+        const s = this.sel[d];
+        if (s && s.b === null) {
+          if (i === s.a) delete this.sel[d];
+          else this.sel[d] = { a: Math.min(s.a, i), b: Math.max(s.a, i) };
+        } else if (s && i >= s.a && i <= s.b) {
+          delete this.sel[d]; delete this.memos[d];
+        } else {
+          this.sel[d] = { a: i, b: null };
+        }
+        this.render();
+        this.renderSummary();
+      },
+
+      toggleOff(d) {
+        const lk = this.lockedOf(d);
+        if (lk) return this.openEdit(lk.id);
+        this.keepMemo(d);
+        if (this.sel[d] && this.sel[d].off) delete this.sel[d];
+        else this.sel[d] = { off: true };
+        this.render();
+        this.renderSummary();
+      },
+
+      keepMemo(d) {   // 申請中を上書きするときは、前のメモを引き継ぐ
+        const p = this.pendingOf(d);
+        if (p && this.memos[d] === undefined && p.memo) this.memos[d] = p.memo;
+      },
+
+      times(r) { return { start: slotTime(r.a), end: slotTime(r.b + 1) }; },
+
+      renderSummary() {
+        const dates = Object.keys(this.sel).sort();
+        $('r-submit').disabled = !dates.some(d => this.sel[d].b !== null);
+        if (!dates.length) { $('r-summary').innerHTML = '<div class="empty">カレンダーで時間を選んでください</div>'; return; }
+        const ovr = d => this.pendingOf(d) ? '<span class="ovr">申請中を上書き</span>' : '';
+        $('r-summary').innerHTML = dates.map(d => {
+          const s = this.sel[d];
+          if (s.off) {
+            return '<div class="sum-item"><div><b>' + fmtDate(d) + '</b>　<span class="offtag">休み希望</span>' + ovr(d) +
+              '<input class="memo" data-d="' + d + '" maxlength="100" placeholder="理由など（任意）" value="' + esc(this.memos[d] || '') + '"></div>' +
+              '<button class="ghost small" data-del="' + d + '">✕</button></div>';
+          }
+          if (s.b === null) {
+            return '<div class="sum-item"><div><b>' + fmtDate(d) + '</b>　' + slotTime(s.a) + '〜' +
+              '<div class="waiting">終了の時間をタップしてください</div></div>' +
+              '<button class="ghost small" data-del="' + d + '">✕</button></div>';
+          }
+          const t = this.times(s);
+          return '<div class="sum-item"><div><b>' + fmtDate(d) + '</b>　' + fmtRange(t.start, t.end) + ovr(d) +
+            '<input class="memo" data-d="' + d + '" maxlength="100" placeholder="メモ（任意）" value="' + esc(this.memos[d] || '') + '"></div>' +
+            '<button class="ghost small" data-del="' + d + '">✕</button></div>';
+        }).join('');
+      },
+
+      async submit() {
+        const dates = Object.keys(this.sel).sort();
+        const half = dates.filter(d => this.sel[d].b === null);
+        if (half.length) return toast(fmtDate(half[0]) + ' の終了時間をタップしてください', true);
+        const items = dates.map(d => this.sel[d].off
+          ? { date: d, type: '休み', memo: this.memos[d] || '' }
+          : Object.assign({ date: d, type: '出勤', memo: this.memos[d] || '' }, this.times(this.sel[d])));
+        if (!confirm('この内容で送信しますか？\n\n' + items.map(x => fmtDate(x.date) + ' ' +
+          (x.type === '休み' ? '休み希望' : fmtRange(x.start, x.end)) + (this.pendingOf(x.date) ? '（上書き）' : '')).join('\n'))) return;
+        $('r-submit').disabled = true;
+        try {
+          const n = await call('staffSubmit', me.token, items);
+          toast(n + '日分の希望を送信しました');
+          this.sel = {}; this.memos = {};
+          this.renderSummary();
+          await this.load();
+        } catch (e) { handleErr(e); $('r-submit').disabled = false; }
+      },
+
+      editing: null,
+
+      openEdit(id) {
+        const x = this.mine.find(r => r.id === id);
+        if (!x) return;
+        if (x.date < todayYmd()) return toast('過ぎた日の希望は編集できません', true);
+        this.editing = id;
+        this.renderMine();
+        const el = document.querySelector('#r-mine [data-item="' + id + '"]');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      },
+
+      editHtml(x) {
+        const off = isOff(x);
+        const def = this.defs[parseYmd(x.date).getDay()];
+        const conf = !off && x.status === '確定' && x.cStart;
+        const st = off ? (def ? def.start : '20:00') : conf ? x.cStart : x.start;
+        const en = off ? (def ? def.end : '02:00') : conf ? x.cEnd : x.end;
+        return '<div class="editbox" data-edit="' + esc(x.id) + '">' +
+          '<div class="seg">' +
+            '<label class="' + (off ? '' : 'on') + '"><input type="radio" name="et" value="出勤"' + (off ? '' : ' checked') + '>出勤</label>' +
+            '<label class="' + (off ? 'on' : '') + '"><input type="radio" name="et" value="休み"' + (off ? ' checked' : '') + '>休み</label>' +
+          '</div>' +
+          '<div class="decide' + (off ? ' dis' : '') + '">' +
+            '<label>開始<input type="time" class="e-s" step="900" value="' + esc(st) + '"></label>' +
+            '<label>終了<input type="time" class="e-e" step="900" value="' + esc(en) + '"></label>' +
+          '</div>' +
+          '<label style="margin:8px 0 0">メモ（任意）<input class="e-memo" maxlength="100" value="' + esc(x.memo) + '"></label>' +
+          (x.status !== '申請中' ? '<p class="hint" style="color:var(--wait)">' +
+            (x.status === '確定' ? '確定済みの内容を変えると、管理者がもう一度確認するまで「申請中」になります。' : 'もう一度、管理者に確認してもらいます。') + '</p>' : '') +
+          '<div class="btns"><button class="ok-btn" data-esave="' + esc(x.id) + '">再送信する</button>' +
+          '<button class="ng-btn" data-ecancel="1">やめる</button></div>' +
+        '</div>';
+      },
+
+      async saveEdit(id) {
+        const box = document.querySelector('[data-edit="' + id + '"]');
+        const type = box.querySelector('input[name="et"]:checked').value;
+        const f = { type: type, start: box.querySelector('.e-s').value, end: box.querySelector('.e-e').value,
+          memo: box.querySelector('.e-memo').value };
+        if (type === '出勤' && (!f.start || !f.end || f.start === f.end)) return toast('時間を正しく入れてください', true);
+        const x = this.mine.find(r => r.id === id);
+        const msg = fmtDate(x.date) + ' を「' + (type === '休み' ? '休み希望' : fmtRange(f.start, f.end)) + '」で再送信しますか？';
+        if (!confirm(msg)) return;
+        const btn = box.querySelector('[data-esave]');
+        btn.disabled = true;
+        try {
+          await call('staffEdit', me.token, id, f);
+          this.editing = null;
+          toast('再送信しました');
+          await this.load();
+        } catch (e) { handleErr(e); btn.disabled = false; }
+      },
+
+      renderMine() {
+        if (!this.mine.length) { $('r-mine').innerHTML = '<div class="empty">まだ希望はありません</div>'; return; }
+        const today = todayYmd();
+        $('r-mine').innerHTML = this.mine.map(x => {
+          const changed = !isOff(x) && x.status === '確定' && (x.cStart !== x.start || x.cEnd !== x.end);
+          const canEdit = x.date >= today;
+          if (this.editing === x.id) {
+            return '<div class="item" data-item="' + esc(x.id) + '"><div class="top"><b>' + fmtDate(x.date) + ' を編集</b>' +
+              '<span class="badge b-' + esc(x.status) + '">' + esc(statusText(x)) + '</span></div>' + this.editHtml(x) + '</div>';
+          }
+          return '<div class="item" data-item="' + esc(x.id) + '"><div class="top">' +
+            '<div><b>' + fmtDate(x.date) + '</b>　' +
+              (isOff(x) ? '<span class="offtag">休み</span>' :
+                x.status === '確定' ? '<b>' + fmtRange(x.cStart, x.cEnd) + '</b>' : fmtRange(x.start, x.end)) + '</div>' +
+            '<span class="badge b-' + esc(x.status) + '">' + esc(statusText(x)) + '</span></div>' +
+            (changed ? '<div class="muted">希望 ' + fmtRange(x.start, x.end) + ' → 時間が調整されました</div>' : '') +
+            (x.memo ? '<div class="muted">メモ：' + esc(x.memo) + '</div>' : '') +
+            (x.prev ? '<div class="prevnote">変更して再申請中（変更前：' + esc(x.prev) + '）</div>' : '') +
+            (x.comment ? '<div class="muted">管理者より：' + esc(x.comment) + '</div>' : '') +
+            '<div class="rowbtns">' +
+              (canEdit ? '<button class="ghost small" data-editid="' + esc(x.id) + '">編集</button>' : '') +
+              (x.status === '申請中' ? '<button class="ghost small" data-cancel="' + esc(x.id) + '">取り消す</button>' : '') +
+            '</div>' +
+          '</div>';
+        }).join('');
+      },
+    };
+
+    $('r-prev').onclick = () => { R.viewStart = addDays(R.viewStart, -DAYS); if (R.viewStart < todayYmd()) R.viewStart = todayYmd(); R.render(); };
+    $('r-next').onclick = () => { R.viewStart = addDays(R.viewStart, DAYS); R.render(); };
+    $('r-gantt').addEventListener('change', ev => {
+      if (ev.target.dataset.off) R.toggleOff(ev.target.dataset.off);
+    });
+    $('r-gantt').addEventListener('click', ev => {
+      const td = ev.target.closest('td[data-d]');
+      if (td) R.tap(td.dataset.d, Number(td.dataset.i));
+    });
+    $('r-summary').addEventListener('input', ev => {
+      if (ev.target.classList.contains('memo')) R.memos[ev.target.dataset.d] = ev.target.value;
+    });
+    $('r-summary').addEventListener('click', ev => {
+      const d = ev.target.dataset.del;
+      if (!d) return;
+      delete R.sel[d]; delete R.memos[d];
+      R.render(); R.renderSummary();
+    });
+    $('r-submit').onclick = () => R.submit();
+    $('r-applyDef').onclick = () => R.applyDefs();
+    $('d-save').onclick = () => R.saveDefs();
+    $('d-rows').addEventListener('change', ev => {
+      if (ev.target.classList.contains('d-on')) ev.target.closest('.defrow').classList.toggle('off', !ev.target.checked);
+    });
+    $('d-copy').onclick = () => {
+      const rows = [...document.querySelectorAll('#d-rows .defrow')].filter(r => r.querySelector('.d-on').checked);
+      if (!rows.length) return toast('コピーする曜日にチェックを入れてください', true);
+      const s = rows[0].querySelector('.d-s').value, e = rows[0].querySelector('.d-e').value;
+      rows.forEach(r => { r.querySelector('.d-s').value = s; r.querySelector('.d-e').value = e; });
+      toast(DOW[Number(rows[0].dataset.w)] + '曜の時間をコピーしました（まだ保存されていません）');
+    };
+    $('r-mine').addEventListener('change', ev => {
+      if (ev.target.name !== 'et') return;
+      const box = ev.target.closest('.editbox');
+      box.querySelectorAll('.seg label').forEach(l => l.classList.toggle('on', l.querySelector('input').checked));
+      box.querySelector('.decide').classList.toggle('dis', ev.target.value === '休み');
+    });
+    $('r-mine').addEventListener('click', async ev => {
+      const t = ev.target;
+      if (t.dataset.editid) return R.openEdit(t.dataset.editid);
+      if (t.dataset.ecancel) { R.editing = null; return R.renderMine(); }
+      if (t.dataset.esave) return R.saveEdit(t.dataset.esave);
+      const id = t.dataset.cancel;
+      if (!id || !confirm('この希望を取り消しますか？')) return;
+      try { await call('staffCancel', me.token, id); toast('取り消しました'); await R.load(); }
+      catch (e) { handleErr(e); }
+    });
+
+    /* ==================================================================
+       全員のシフト
+       ================================================================== */
+    const A = {
+      mode: 'day', day: null, data: [],
+      reset() { this.mode = 'day'; this.day = todayYmd(); this.data = []; this.setModeButtons(); },
+      setModeButtons() {
+        $('a-modeDay').classList.toggle('on', this.mode === 'day');
+        $('a-modeWeek').classList.toggle('on', this.mode === 'week');
+      },
+      range() {
+        if (this.mode === 'day') return [this.day, this.day];
+        const m = mondayOf(this.day);
+        return [m, addDays(m, 6)];
+      },
+      async load() {
+        const r = this.range();
+        $('a-label').textContent = this.mode === 'day' ? fmtDate(r[0]) : fmtDate(r[0]) + ' 〜 ' + fmtDate(r[1]);
+        $('a-body').innerHTML = '<div class="empty">読み込み中…</div>';
+        $('a-hint').textContent = '';
+        try {
+          this.data = await call('allShifts', me.token, r[0], r[1]);
+          this.mode === 'day' ? this.renderDay() : this.renderWeek(r[0]);
+        } catch (e) { handleErr(e); }
+      },
+      move(n) { this.day = addDays(this.day, this.mode === 'day' ? n : n * 7); this.load(); },
+
+      slotsOf(x) { return x.status === '確定' ? rangeToSlots(x.cStart, x.cEnd) : rangeToSlots(x.start, x.end); },
+
+      renderDay() {
+        const offs = this.data.filter(x => x.date === this.day && isOff(x));
+        const offText = offs.length ? '　休み：' + offs.map(x => x.name + (x.status === '確定' ? '' : '（希望）')).join('、') : '';
+        const list = this.data.filter(x => x.date === this.day && !isOff(x))
+          .sort((a, b) => this.slotsOf(a)[0] - this.slotsOf(b)[0] || (a.status === '確定' ? -1 : 1));
+        if (!list.length) {
+          $('a-body').innerHTML = '<div class="empty">この日のシフトはまだありません</div>';
+          $('a-hint').textContent = offText.trim();
+          return;
+        }
+
+        $('a-body').innerHTML = dayGanttHtml(list);
+
+        const ok = list.filter(x => x.status === '確定');
+        $('a-hint').textContent = '確定 ' + ok.length + '人' +
+          (isAdmin() ? '　申請中 ' + (list.length - ok.length) + '人' : '') + offText + '。「人数」は確定した人の数です。';
+      },
+
+      renderWeek(monday) {
+        const days = [...Array(7)].map((_, i) => addDays(monday, i));
+        const names = [];
+        this.data.forEach(x => { if (names.indexOf(x.name) < 0) names.push(x.name); });
+        if (!names.length) { $('a-body').innerHTML = '<div class="empty">この週のシフトはまだありません</div>'; return; }
+
+        let h = '<table class="wtable"><tr><th>名前</th>' + days.map(d => '<th>' + fmtDate(d) + '</th>').join('') + '</tr>';
+        names.forEach(n => {
+          h += '<tr><td class="name">' + esc(n) + '</td>';
+          days.forEach(d => {
+            const x = this.data.find(r => r.name === n && r.date === d);
+            if (!x) h += '<td></td>';
+            else if (isOff(x)) h += '<td>' + (x.status === '確定' ? '<span class="offtxt">休</span>' : '<span class="wait">休み希望</span>') + '</td>';
+            else if (x.status === '確定') h += '<td>' + fmtRange(x.cStart, x.cEnd) + '</td>';
+            else h += '<td><span class="wait">希望 ' + fmtRange(x.start, x.end) + '</span></td>';
+          });
+          h += '</tr>';
+        });
+        h += '<tr><th>出勤人数</th>' + days.map(d =>
+          '<th>' + this.data.filter(r => r.date === d && r.status === '確定' && !isOff(r)).length + '</th>').join('') + '</tr></table>';
+        $('a-body').innerHTML = h;
+        $('a-hint').textContent = 'スクショしてグループLINEに流せます。' + (isAdmin() ? 'オレンジ字は未確定の希望です。' : '');
+      },
+    };
+
+    $('a-modeDay').onclick = () => { A.mode = 'day'; A.setModeButtons(); A.load(); };
+    $('a-modeWeek').onclick = () => { A.mode = 'week'; A.setModeButtons(); A.load(); };
+    $('a-prev').onclick = () => A.move(-1);
+    $('a-next').onclick = () => A.move(1);
+    $('a-today').onclick = () => { A.day = todayYmd(); A.load(); };
+
+    /* ==================================================================
+       確定作業（管理者）
+       ================================================================== */
+    const M = {
+      day: null, data: null, weekLoaded: null,
+      reset() { this.day = todayYmd(); this.weekLoaded = null; },
+
+      async load() {
+        const mon = mondayOf(this.day);
+        $('m-label').textContent = fmtDate(mon) + ' 〜 ' + fmtDate(addDays(mon, 6));
+        $('m-list').innerHTML = '<div class="empty">読み込み中…</div>';
+        try {
+          this.data = await call('adminWeek', me.token, mon);
+          this.weekLoaded = mon;
+          const n = this.data.pendingTotal;
+          $('m-pill').textContent = n ? '未処理の希望（今日以降）：' + n + '件' : '未処理の希望はありません';
+          $('mngCnt').textContent = n;
+          $('mngCnt').classList.toggle('hidden', !n);
+          this.render();
+        } catch (e) { handleErr(e); }
+      },
+
+      pick(d) {
+        this.day = d;
+        if (mondayOf(d) === this.weekLoaded) this.render(); else this.load();
+      },
+
+      render() {
+        const mon = mondayOf(this.day), reqs = this.data.reqs;
+        // 曜日ボタン（申請中の件数つき）
+        $('m-strip').innerHTML = [...Array(7)].map((_, i) => {
+          const d = addDays(mon, i), dow = parseYmd(d).getDay();
+          const pend = reqs.filter(x => x.date === d && x.status === '申請中').length;
+          const ok = reqs.filter(x => x.date === d && x.status === '確定' && !isOff(x)).length;
+          return '<button data-day="' + d + '" class="' + (d === this.day ? 'on ' : '') + (dow === 6 ? 'sat' : dow === 0 ? 'sun' : '') + '">' +
+            DOW[dow] + '<br>' + (parseYmd(d).getMonth() + 1) + '/' + parseYmd(d).getDate() +
+            '<span class="dk">確定' + ok + '</span>' + (pend ? '<span class="dc">' + pend + '</span>' : '') + '</button>';
+        }).join('');
+
+        // その日の全体像
+        const all = reqs.filter(x => x.date === this.day);
+        const work = all.filter(x => !isOff(x)), offs = all.filter(isOff);
+        const cnt = (arr, st) => arr.filter(x => x.status === st).length;
+        const pendWork = work.filter(x => x.status === '申請中');
+        let h = '<h2>' + fmtDate(this.day) + ' の希望者</h2>' +
+          '<div class="muted" style="margin-bottom:8px">出勤 ' + work.length + '人（申請中 ' + cnt(work, '申請中') + '・確定 ' + cnt(work, '確定') +
+          '・見送り ' + cnt(work, '見送り') + '）' + (offs.length ? '　休み希望 ' + offs.length + '人' : '') + '</div>';
+        const active = work.filter(x => x.status === '申請中' || x.status === '確定')
+          .sort((a, b) => slotsOf(a)[0] - slotsOf(b)[0] || (a.status === '確定' ? -1 : 1));
+        h += active.length ? '<div class="gwrap">' + dayGanttHtml(active) + '</div>' +
+          '<p class="hint">緑＝確定、オレンジ＝申請中。「人数」は確定した人の数です。</p>' : '<div class="empty">出勤の希望はありません</div>';
+        if (pendWork.length) h += '<button class="bulk" data-bulk="1">申請中の出勤 ' + pendWork.length + '件を希望どおり確定</button>';
+        $('m-day').innerHTML = h;
+
+        // 1人ずつの操作
+        const order = { '申請中': 0, '確定': 1, '見送り': 2 };
+        const list = all.slice().sort((a, b) => order[a.status] - order[b.status] ||
+          (isOff(a) - isOff(b)) || (a.start || '').localeCompare(b.start || ''));
+        $('m-list').innerHTML = '<h2>一人ずつ確定</h2>' +
+          (list.length ? list.map(x => this.itemHtml(x)).join('') : '<div class="empty">この日の希望はありません</div>');
+
+        $('m-addDate').value = this.day;
+      },
+
+      itemHtml(x) {
+        let h = '<div class="item" data-id="' + esc(x.id) + '"><div class="top">' +
+          '<div><b>' + esc(x.name) + '</b>　' + (isOff(x) ? '<span class="offtag">休み希望</span>' : '希望 ' + fmtRange(x.start, x.end)) + '</div>' +
+          '<span class="badge b-' + esc(x.status) + '">' + esc(statusText(x)) + '</span></div>';
+        if (x.prev) h += '<div class="prevnote">本人が変更して再申請（変更前：' + esc(x.prev) + '）</div>';
+        if (x.memo) h += '<div class="muted">メモ：' + esc(x.memo) + '</div>';
+        if (x.status === '申請中' && isOff(x)) {
+          h += '<div class="decide"><label class="full">コメント（任意・本人に見えます）<input class="d-comment" maxlength="100"></label></div>' +
+            '<div class="btns"><button class="ok-btn" data-act="ok">休みを承認</button>' +
+            '<button class="ng-btn" data-act="ng">却下</button></div>';
+        } else if (x.status === '申請中') {
+          h += '<div class="decide">' +
+            '<label>確定 開始<input type="time" class="d-start" value="' + esc(x.start) + '" step="900"></label>' +
+            '<label>確定 終了<input type="time" class="d-end" value="' + esc(x.end) + '" step="900"></label>' +
+            '<label class="full">コメント（任意・本人に見えます）<input class="d-comment" maxlength="100"></label>' +
+            '</div><div class="btns">' +
+            '<button class="ok-btn" data-act="ok">確定</button>' +
+            '<button class="ng-btn" data-act="ng">見送り</button></div>';
+        } else {
+          if (x.status === '確定' && !isOff(x)) h += '<div><b>確定 ' + fmtRange(x.cStart, x.cEnd) + '</b></div>';
+          if (x.comment) h += '<div class="muted">コメント：' + esc(x.comment) + '</div>';
+          h += '<div class="muted">' + esc(x.updatedBy) + '・' + esc(x.updatedAt) + '</div>' +
+            '<button class="ghost small" style="margin-top:6px" data-act="reset">申請中に戻す</button>';
+        }
+        return h + '</div>';
+      },
+    };
+
+    $('m-prev').onclick = () => M.pick(addDays(M.day, -7));
+    $('m-next').onclick = () => M.pick(addDays(M.day, 7));
+    $('m-this').onclick = () => M.pick(todayYmd());
+    $('m-strip').addEventListener('click', ev => {
+      const b = ev.target.closest('button[data-day]');
+      if (b) M.pick(b.dataset.day);
+    });
+    $('m-day').addEventListener('click', async ev => {
+      if (!ev.target.dataset.bulk) return;
+      const ids = M.data.reqs.filter(x => x.date === M.day && x.status === '申請中' && !isOff(x)).map(x => x.id);
+      if (!confirm(fmtDate(M.day) + ' の申請中 ' + ids.length + '件を、希望どおりの時間で確定しますか？')) return;
+      ev.target.disabled = true;
+      try {
+        const n = await call('adminBulkOk', me.token, ids);
+        toast(n + '件を確定しました');
+        await M.load();
+      } catch (e) { handleErr(e); ev.target.disabled = false; }
+    });
+
+    $('m-list').addEventListener('click', async ev => {
+      const act = ev.target.dataset.act;
+      if (!act) return;
+      const el = ev.target.closest('.item');
+      const q = c => el.querySelector(c);
+      if (act === 'reset' && !confirm('申請中に戻しますか？')) return;
+      ev.target.disabled = true;
+      try {
+        await call('adminDecide', me.token, el.dataset.id, act,
+          q('.d-start') ? q('.d-start').value : '', q('.d-end') ? q('.d-end').value : '',
+          q('.d-comment') ? q('.d-comment').value : null);
+        toast(act === 'ok' ? '確定（承認）しました' : act === 'ng' ? '見送り（却下）にしました' : '申請中に戻しました');
+        await M.load();
+      } catch (e) { handleErr(e); ev.target.disabled = false; }
+    });
+
+    $('m-addBtn').onclick = async () => {
+      const sid = $('m-addStaff').value, date = $('m-addDate').value;
+      if (!sid || !date) return toast('スタッフと日付を選んでください', true);
+      $('m-addBtn').disabled = true;
+      try {
+        await call('adminAdd', me.token, sid, date, $('m-addStart').value, $('m-addEnd').value, $('m-addComment').value);
+        toast('追加しました');
+        $('m-addComment').value = '';
+        await M.load();
+      } catch (e) { handleErr(e); }
+      $('m-addBtn').disabled = false;
+    };
+  </script>
+</body>
+</html>

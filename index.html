@@ -76,6 +76,9 @@
       border-bottom: 1px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .gantt th.sat { color: #1c7ed6; } .gantt th.sun { color: #e03131; }
     .gantt th .lock { display: block; font-size: 9px; color: var(--sub); }
+    .gantt th.staff-col { vertical-align: bottom; overflow: visible; white-space: normal; text-overflow: clip; }
+    .gantt .staff-name { display: inline-block; writing-mode: vertical-rl; text-orientation: upright;
+      white-space: nowrap; letter-spacing: 2px; line-height: 1.4; padding: 5px 0; font-size: 12px; }
     .gantt td { height: 17px; border-left: 1px solid var(--line); touch-action: manipulation; }
     .gantt tr.hour td { border-top: 1px solid #ddd; }
     .gantt tr.half td { border-top: 1px dotted #eee; }
@@ -368,7 +371,7 @@
 
   <script>
     // ===== 営業時間の設定（ここを変えるとカレンダーの縦軸が変わります） =====
-    const OPEN_HOUR = 10;    // 何時から（10 = 10:00）
+    const OPEN_HOUR = 9;     // 何時から（9 = 09:00）
     const CLOSE_HOUR = 29;   // 何時まで（24以上は翌日。29 = 翌5:00）
     const SLOT_MIN = 30;     // 1マスの分数
     const DAYS = 7;          // 希望カレンダーの表示日数
@@ -423,8 +426,8 @@
     const slotsOf = x => x.status === '確定' ? rangeToSlots(x.cStart, x.cEnd) : rangeToSlots(x.start, x.end);
     function dayGanttHtml(list) {
     const spans = list.map(x => slotsOf(x));
-    let h = '<table class="gantt"><thead><tr><th style="width:30px"></th><th style="width:34px">人数</th>' +
-      list.map(x => '<th title="' + esc(x.name) + '">' + esc(x.name) +
+    let h = '<table class="gantt" style="min-width:' + (64 + list.length * 26) + 'px"><thead><tr><th style="width:30px"></th><th style="width:34px">人数</th>' +
+      list.map(x => '<th class="staff-col" title="' + esc(x.name) + '"><span class="staff-name">' + esc(x.name) + '</span>' +
         (x.status === '申請中' ? '<span class="lock">申請中</span>' : '') + '</th>').join('') + '</tr></thead><tbody>';
 
     let maxCnt = 0;
@@ -906,7 +909,7 @@
       renderDay() {
         const offs = this.data.filter(x => x.date === this.day && isOff(x));
         const offText = offs.length ? '　休み：' + offs.map(x => x.name + (x.status === '確定' ? '' : '（希望）')).join('、') : '';
-        const list = this.data.filter(x => x.date === this.day && !isOff(x))
+        const list = this.data.filter(x => x.date === this.day && !isOff(x) && this.slotsOf(x)[1] > this.slotsOf(x)[0])
           .sort((a, b) => this.slotsOf(a)[0] - this.slotsOf(b)[0] || (a.status === '確定' ? -1 : 1));
         if (!list.length) {
           $('a-body').innerHTML = '<div class="empty">この日のシフトはまだありません</div>';
@@ -1015,7 +1018,7 @@
             const f = fin[k], d = this.draft[x.id];
             const lab = f.changed ? '<span class="lock" style="color:var(--pink);font-weight:bold">変更→' + (f.st === '確定' ? '確定' : '見送り') + '</span>'
               : '<span class="lock">' + esc(x.status) + '</span>';
-            return '<th title="' + esc(x.name) + '">' + esc(x.name) + lab +
+            return '<th class="staff-col" title="' + esc(x.name) + '"><span class="staff-name">' + esc(x.name) + '</span>' + lab +
               '<label class="offchk' + (f.st === '見送り' ? ' on' : '') + '"><input type="checkbox" data-ng="' + esc(x.id) + '"' +
               (f.st === '見送り' ? ' checked' : '') + '>見送</label></th>';
           }).join('') + '</tr></thead><tbody>';
